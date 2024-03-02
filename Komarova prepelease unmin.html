@@ -1,0 +1,268 @@
+<style>
+  .dg.ac {
+   z-index: 99999 !important;
+  }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/loaders/GLTFLoader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/loaders/RGBELoader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/postprocessing/Pass.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/shaders/CopyShader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/postprocessing/ShaderPass.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/postprocessing/EffectComposer.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/postprocessing/RenderPass.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/postprocessing/UnrealBloomPass.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.132.0/examples/js/shaders/LuminosityHighPassShader.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script>
+  const scene = new THREE.Scene();
+  const iframeAtom = document.querySelector('.three')
+  const canvas = iframeAtom.querySelector('canvas')
+  const isnotmob = window.innerWidth > 960
+    
+  /**
+   * Loaders
+   */
+  const textureLoader = new THREE.TextureLoader()
+  const gltfLoader = new THREE.GLTFLoader()
+  const hdrLoader = new THREE.RGBELoader();
+  
+  /**
+   * Textures
+   */
+  const normalTexture = textureLoader.load('https://static.tildacdn.com/tild6362-6439-4765-b730-613966626532/Hedra027_Corona_Norm.png');
+  const roughnessTexture = textureLoader.load('https://static.tildacdn.com/tild3563-3863-4638-b266-623066666431/Hedra027_Corona_Refl.png');
+  const alphaTexture = textureLoader.load('https://static.tildacdn.com/tild3331-3163-4236-b835-623963363330/027_Alpha.png');
+  const aoTexture = textureLoader.load('https://static.tildacdn.com/tild3935-6239-4462-b361-356536326639/Hedra027_Corona_Beau.png'); 
+  
+  // Ensure textures do not flip on the Y axis
+  normalTexture.flipY = false;
+  roughnessTexture.flipY = false;
+  alphaTexture.flipY = false;
+  aoTexture.flipY = false;
+  
+  /**
+   * Materials
+   */
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff,
+    metalness: 0.65,
+    roughness: 0.35,
+    transmission: 0.93,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+    reflectivity: 1,
+    ior: 1.5,
+    transparent: true,
+  //   normalMap: normalTexture,
+    roughnessMap: roughnessTexture,
+    alphaMap: alphaTexture,
+    aoMap: aoTexture,
+    thickness: 1,
+    });
+  glassMaterial.normalScale.set(0.5, 0.5);
+  
+  // Array to store the meshes from the GLTF model
+  const sectionMeshes = [];
+  const originalPositions = new Map();
+  const hdrurl = isnotmob ? 2 : 1
+  
+  
+  /**
+   * Environment map setup
+   */
+  hdrLoader.load(`https://cdn.jsdelivr.net/gh/Nodaysofff/three-test/moonless_golf_${hdrurl}k.hdr`, function(texture) {
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = texture;
+  
+    gltfLoader.load('https://cdn.jsdelivr.net/gh/Nodaysofff/three-test/Test7/027.glb', (gltf) => {
+      gltf.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry.computeVertexNormals();
+          child.material = glassMaterial;
+          sectionMeshes.push(child);
+          originalPositions.set(child, child.position.clone());
+          child.rotation.z = 5.25;
+        }
+      });
+      
+    // Centering
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const center = box.getCenter(new THREE.Vector3());
+    gltf.scene.position.x += (gltf.scene.position.x - center.x);
+    gltf.scene.position.y += (gltf.scene.position.y - center.y);
+    gltf.scene.position.z += (gltf.scene.position.z - center.z);
+    
+    gltf.scene.rotation.y = 0.1;
+    gltf.scene.rotation.y = 6;
+    
+    scene.add(gltf.scene);
+    });
+  });
+    
+  
+  /**
+  * Sizes
+  */
+  const sizes = {
+      width: window.innerWidth,
+      height: window.innerHeight
+  }
+  
+  window.addEventListener('resize', () =>
+  {
+      sizes.width = window.innerWidth
+      sizes.height = window.innerHeight
+  
+      camera.aspect = sizes.width / sizes.height
+      camera.updateProjectionMatrix()
+  
+      renderer.setSize(sizes.width, sizes.height)
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  })
+    
+    
+  /**
+  * Camera + Helpers
+  */ 
+    const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.01, 100);
+    (camera.position.z = 0.125), (camera.position.y = 0), scene.add(camera);
+  
+  // Camera lookAt position object
+  camera.lookAt(-0.022, 0.01, 0.02);
+  
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setClearColor(0x000000),
+    renderer.setSize(sizes.width, sizes.height),
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  
+  
+  /**
+  * Raycaster and mouse setup
+  */
+  const raycaster = isnotmob ? new THREE.Raycaster() : null;
+  const mouse = isnotmob ? new THREE.Vector2(-2, -2) : null;
+  if (isnotmob) { window.addEventListener('mousemove', (event) => {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  })
+  };
+      
+  /**
+  * Post-processing
+  */ 
+  const composer = new THREE.EffectComposer(renderer);
+  const renderPass = new THREE.RenderPass(scene, camera);
+  composer.addPass(renderPass);
+  const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+  if (isnotmob) {
+  composer.addPass(bloomPass);
+  
+  /**
+  * Light
+  */  
+    const pointLight1 = new THREE.PointLight(0xffffff, 1);
+    pointLight1.position.set(0, 2, 2);
+    scene.add(pointLight1);
+    
+    const pointLight2 = new THREE.PointLight(0xee663b, 1);
+    pointLight2.position.set(0, 2, -2);
+    scene.add(pointLight2);
+    
+    const pointLight3 = new THREE.PointLight(0xffffff, 500);
+    pointLight3.position.set(0, -0.01, -0.01);
+    scene.add(pointLight3);
+    
+    const pointLight4 = new THREE.PointLight(0xffffff, 1);
+    pointLight4.position.set(2, 1, 2);
+    scene.add(pointLight4);
+  }
+    
+    // Ambient Light
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+    
+   
+    
+  const clock = new THREE.Clock();
+  let previousTime = 0;
+  let hoveredMesh = null;
+  let targetRotation = { x: 0, y: 0, z: 0 };
+  
+  // Define a rotation speed multiplier
+  let rotationSpeedMultiplier = 1;
+  let oscillationSpeed = 0.5; // Speed of the up and down movement
+  let oscillationDistance = 0.004; // Distance of the up and down movement
+  
+  const tick = () => {
+      const elapsedTime = clock.getElapsedTime();
+      const deltaTime = elapsedTime - previousTime;
+      previousTime = elapsedTime;
+  
+      // Calculate oscillation
+      const oscillationOffset = Math.sin(elapsedTime * oscillationSpeed) * oscillationDistance;
+  
+      if (isnotmob) {
+      // Raycaster check for intersections
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(sectionMeshes);
+  
+      if (intersects.length > 0) {
+          const intersectedMesh = intersects[0].object;
+          const intersectionPoint = intersects[0].point;
+          const meshBounds = new THREE.Box3().setFromObject(intersectedMesh);
+          const meshCenter = new THREE.Vector3();
+          meshBounds.getCenter(meshCenter);
+          meshCenter.applyMatrix4(intersectedMesh.matrixWorld); // Convert to world space
+  
+          // Calculate the direction for the lean based on the intersection point
+          const direction = new THREE.Vector3().subVectors(intersectionPoint, meshCenter).normalize();
+          const angleX = Math.atan2(direction.y, direction.z);
+          const angleY = -Math.atan2(direction.x, direction.z);
+  
+          // Reverse the effect by negating the calculated angles
+          const targetRotationX = -angleX * 0.2; // Negate and adjust these factors as needed
+          const targetRotationY = -angleY * 0.2; // Negate and adjust these factors as needed
+  
+          // Check if the mesh is already being hovered
+          if (hoveredMesh !== intersectedMesh) {
+              hoveredMesh = intersectedMesh;
+          }
+  
+          // Use GSAP to animate the rotation with easing
+          gsap.to(hoveredMesh.rotation, {
+              x: targetRotationX,
+              y: targetRotationY,
+              duration: 5,
+              ease: 'power3.out'
+          });
+      } else {
+          if (hoveredMesh) {
+              // Reset rotation if no longer hovering
+              gsap.to(hoveredMesh.rotation, {
+                  x: 0,
+                  y: 0,
+                  duration: 5,
+                  ease: 'power3.out'
+              });
+              hoveredMesh = null;
+          }
+      }
+      }
+  
+      // Constant static rotation and oscillation
+      sectionMeshes.forEach((mesh) => {
+          mesh.rotation.z += deltaTime * 0.1 * rotationSpeedMultiplier;
+          const originalPosition = originalPositions.get(mesh);
+          if (originalPosition) {
+              mesh.position.z = originalPosition.z + oscillationOffset;
+          }
+      });
+  
+      composer.render();
+      window.requestAnimationFrame(tick);
+  };
+  
+  tick();
+  
+  </script>
